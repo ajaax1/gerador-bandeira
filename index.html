@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerador de bandeiras</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Merriweather:ital,wght@0,400;0,900;1,400;1,900&family=Montserrat:ital,wght@0,400;0,800;1,400;1,800&family=Oswald:wght@400;700&family=Roboto:ital,wght@0,400;0,700;0,800;1,400;1,800&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="app">
+  <aside class="painel">
+    <header class="painelTopo">
+      <h1>Gerador de bandeiras</h1>
+      <p>Envie o logo ou desenhe com formas, escolha a cor e baixe o vídeo da bandeira tremulando.</p>
+    </header>
+
+    <section class="grupo">
+      <h2>Partido</h2>
+      <label class="campo">
+        <span>Sigla</span>
+        <input id="sigla" type="text" value="PT" maxlength="12">
+      </label>
+      <div class="campo">
+        <span>Logo</span>
+        <label class="upload" id="uploadArea">
+          <input id="logo" type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg">
+          <span id="uploadTexto">Escolher arquivo (PNG ou SVG com fundo transparente)</span>
+        </label>
+      </div>
+      <label class="check">
+        <input id="removerBranco" type="checkbox">
+        <span>Remover fundo branco do logo</span>
+      </label>
+      <button type="button" id="tirarLogo" class="botao secundario">Bandeira sem logo</button>
+      <div class="campo">
+        <span>Cor de fundo</span>
+        <div class="cor">
+          <input id="corPicker" type="color" value="#e30613">
+          <input id="corHex" type="text" value="#E30613" maxlength="7" spellcheck="false" aria-label="Cor em hexadecimal">
+        </div>
+      </div>
+    </section>
+
+    <section class="grupo" id="grupoLogo">
+      <h2>Logo na bandeira</h2>
+      <label class="campo faixa">
+        <span>Altura <output id="tamanhoValor"></output></span>
+        <input id="tamanho" type="range" min="60" max="340" step="2" value="230">
+      </label>
+      <label class="campo faixa">
+        <span>Posição horizontal <output id="posXValor"></output></span>
+        <input id="posX" type="range" min="640" max="1180" step="2" value="960">
+      </label>
+      <label class="campo faixa">
+        <span>Posição vertical <output id="posYValor"></output></span>
+        <input id="posY" type="range" min="-120" max="120" step="2" value="0">
+      </label>
+    </section>
+
+    <section class="grupo">
+      <h2>Formas</h2>
+      <div class="adicionar" id="adicionarFormas" aria-label="Adicionar forma"></div>
+      <div class="campo">
+        <span>Modelos prontos</span>
+        <div class="botoes tres">
+          <button type="button" class="botao secundario" data-modelo="tresFaixas">3 faixas</button>
+          <button type="button" class="botao secundario" data-modelo="diagonal">Diagonal</button>
+          <button type="button" class="botao secundario" data-modelo="faixasV">Faixas verticais</button>
+        </div>
+      </div>
+      <div class="campo">
+        <span>Camadas <small>(a de cima fica na frente)</small></span>
+        <ul class="camadas" id="camadas"></ul>
+      </div>
+      <div class="propriedades" id="propriedades"></div>
+    </section>
+
+    <section class="grupo">
+      <h2>Cabeçalho do modal</h2>
+      <div class="campo">
+        <span>Texto</span>
+        <div class="segmentado" role="radiogroup" aria-label="Cor do texto">
+          <label><input type="radio" name="texto" value="auto" checked><span>Automático</span></label>
+          <label><input type="radio" name="texto" value="claro"><span>Branco</span></label>
+          <label><input type="radio" name="texto" value="escuro"><span>Escuro</span></label>
+        </div>
+      </div>
+      <label class="campo faixa">
+        <span>Véu à esquerda <output id="veuValor"></output></span>
+        <input id="veu" type="range" min="0" max="0.9" step="0.05" value="0.25">
+      </label>
+    </section>
+
+    <details class="grupo">
+      <summary>Ajustes do tecido</summary>
+      <label class="campo faixa">
+        <span>Contraste das dobras <output id="contrasteValor"></output></span>
+        <input id="contraste" type="range" min="0" max="2" step="0.05" value="1">
+      </label>
+      <label class="campo faixa">
+        <span>Brilho <output id="brilhoValor"></output></span>
+        <input id="brilho" type="range" min="0" max="1" step="0.05" value="0.35">
+      </label>
+      <label class="campo faixa">
+        <span>Sombra <output id="sombraValor"></output></span>
+        <input id="sombra" type="range" min="0" max="1" step="0.05" value="0.6">
+      </label>
+      <label class="campo faixa">
+        <span>Deslocamento do logo <output id="deslocValor"></output></span>
+        <input id="desloc" type="range" min="0" max="3" step="0.05" value="1">
+      </label>
+      <button type="button" id="restaurar" class="botao secundario">Restaurar padrão</button>
+    </details>
+
+    <section class="grupo">
+      <h2>Baixar</h2>
+      <div class="campo">
+        <span>Qualidade do vídeo</span>
+        <div class="segmentado" role="radiogroup" aria-label="Qualidade do vídeo">
+          <label><input type="radio" name="qualidade" value="1000000" checked><span>Leve</span></label>
+          <label><input type="radio" name="qualidade" value="2500000"><span>Média</span></label>
+          <label><input type="radio" name="qualidade" value="6000000"><span>Alta</span></label>
+        </div>
+      </div>
+      <div class="botoes">
+        <button type="button" id="baixarWebm" class="botao">Vídeo WebM</button>
+        <button type="button" id="baixarMp4" class="botao">Vídeo MP4</button>
+      </div>
+      <div class="botoes">
+        <button type="button" id="baixarArte" class="botao secundario">Arte PNG</button>
+        <button type="button" id="baixarConfig" class="botao secundario">Salvar projeto</button>
+      </div>
+      <label class="botao secundario abrirProjeto">
+        <input id="abrirProjeto" type="file" accept="application/json,.json">
+        <span>Abrir projeto salvo</span>
+      </label>
+      <p class="status" id="status" role="status"></p>
+    </section>
+  </aside>
+
+  <main class="palco">
+    <div class="modal">
+      <div class="modalTopo" id="modalTopo">
+        <canvas id="bandeira" width="1280" height="366"></canvas>
+        <div class="veu" id="veuCamada"></div>
+        <div class="modalConteudo" id="modalConteudo">
+          <div class="modalTitulo">
+            <h2>Detalhes do parlamentar</h2>
+            <span class="fechar" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </span>
+          </div>
+          <div class="parlamentar">
+            <div class="foto" aria-hidden="true">AS</div>
+            <div class="dados">
+              <strong>Alencar Santana</strong>
+              <div class="chips"><span class="chip" id="chipSigla">PT</span><span class="chip">SP</span></div>
+              <span>Período: 2025 a 2026</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modalCorpo">
+        <div class="cartao"><span>Total de emendas</span><strong>3</strong></div>
+        <div class="cartao"><span>Total empenhado</span><strong class="valor">R$ 800.000,00</strong></div>
+      </div>
+    </div>
+    <p class="dica">Prévia ao vivo. O vídeo baixado é a faixa da bandeira (1280×366), sem o modal.</p>
+    <section class="editorBloco">
+      <div class="editorTopo">
+        <strong>Desenho da bandeira</strong>
+        <span>Clique para selecionar, arraste para mover e use a alça redonda para redimensionar. Setas movem; Delete apaga.</span>
+      </div>
+      <canvas id="editor" tabindex="0" aria-label="Editor da bandeira: selecione e mova as formas"></canvas>
+    </section>
+  </main>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
