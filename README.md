@@ -31,11 +31,19 @@ Abra o endereço que o Vite mostrar (ex.: http://localhost:5173).
 - "Bandeira sem logo" tira o logo para fazer a bandeira só com formas.
 - **Salvar projeto** guarda tudo (formas, cor, logo embutido) num JSON; **Abrir projeto salvo** retoma depois.
 
-A gravação leva 20 s (a duração do loop). Qualidade "Leve" ≈ 2,5 MB, "Média" ≈ 6 MB, "Alta" ≈ 15 MB.
+### Tamanho do vídeo
 
-## Qualidade máxima e arquivo menor (ffmpeg)
+O vídeo é gerado quadro a quadro com WebCodecs (Chrome, Edge e Safari recentes), sem depender de tocar em tempo real, e sai com a duração correta. No Firefox, cai na gravação em tempo real (arquivo maior).
 
-O vídeo gravado pelo navegador é maior que o gerado pelo ffmpeg. Para produção:
+- **Duração do loop**: 6, 10 (padrão) ou 20 s. É vai e volta, então o loop não tem emenda.
+- **Resolução**: 1280 px ou 960 px (celular, cerca de 40% menor).
+- **Qualidade**: Leve, Média (padrão) ou Alta.
+
+Medido com 10 s em 1280 px: WebM 306 KB (Leve), 526 KB (Média), 976 KB (Alta); MP4 426 KB, 792 KB, 1,6 MB. Em 960 px e 6 s, menos ainda.
+
+## Gerar pelo ffmpeg (opcional)
+
+Para comparar ou para máxima qualidade, o ffmpeg continua disponível:
 
 ```bash
 FFMPEG=ffmpeg scripts/gerar-bandeira.sh scripts/tecido-cinza.mp4 arte-pt.png bandeira-pt.webm
@@ -46,12 +54,13 @@ Usa a "Arte PNG" baixada daqui. Sai com uns 600 KB a 1 MB e com a duração corr
 
 ## Como funciona
 
-- `public/tecido-luz.mp4`: o tecido já processado (luz sem o gradiente e dobras suavizadas, em vai e volta de 20 s, faixa 1280×366). Metade de cima = luz; metade de baixo = luz desfocada, que move o logo junto com as dobras.
+- `public/tecido-luz-{6,10,20}.mp4`: o tecido já processado (luz sem o gradiente e dobras suavizadas, em vai e volta, faixa 1280×366). Metade de cima = luz; metade de baixo = luz desfocada, que move o logo junto com as dobras.
 - `src/renderizador.ts`: shader WebGL2 que aplica luz, sombra e deslocamento sobre a arte, quadro a quadro.
 - `src/arte.ts`: desenha a arte plana (cor + logo) em 2x.
-- `src/exportar.ts`: grava o canvas com MediaRecorder.
+- `src/codificar.ts`: lê o tecido quadro a quadro (mp4box + VideoDecoder), desenha cada quadro e codifica (VideoEncoder + mp4-muxer/webm-muxer).
+- `src/exportar.ts`: gravação em tempo real com MediaRecorder (reserva para navegadores sem WebCodecs).
 
-Para trocar o tecido: `FFMPEG=ffmpeg scripts/preparar-tecido.sh <novo-tecido.mp4>`.
+Para trocar o tecido: `for d in 6 10 20; do DURACAO=$d FFMPEG=ffmpeg scripts/preparar-tecido.sh <novo-tecido.mp4>; done`.
 
 ## No modal (front)
 

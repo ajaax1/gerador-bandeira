@@ -129,6 +129,7 @@ input[type="range"] { width: 100%; accent-color: var(--destaque); }
     border-radius: 8px;
     overflow: hidden;
 }
+.segmentado.duas { grid-template-columns: repeat(2, 1fr); }
 .segmentado label { position: relative; cursor: pointer; }
 .segmentado input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
 .segmentado span {

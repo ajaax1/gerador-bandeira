@@ -1,6 +1,7 @@
 import "./style.css";
 import { carregarLogo, criarCanvasArte, hexParaRgb, luminancia, type ConfigArte } from "./arte";
 import { Editor, ID_LOGO } from "./editor";
+import { codificarVideo, webCodecsDisponivel, type Qualidade } from "./codificar";
 import { baixarBlob, gravarVideo, tipoSuportado, type Formato } from "./exportar";
 import {
     criarForma,
@@ -15,7 +16,7 @@ import {
 import { PainelFormas } from "./painelFormas";
 import { Renderizador, type AjustesTecido } from "./renderizador";
 
-const urlLuz = `${import.meta.env.BASE_URL}tecido-luz.mp4`;
+const urlLuz = (duracao: number) => `${import.meta.env.BASE_URL}tecido-luz-${duracao}.mp4`;
 const urlExemplo = `${import.meta.env.BASE_URL}exemplo-pt.svg`;
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -35,7 +36,9 @@ const estado = {
     tecido: { ...PADRAO_TECIDO },
     formas: [] as Forma[],
     selecionado: null as string | null,
+    duracao: 10,
     gravando: false,
+    pausarPrevia: false,
 };
 
 const canvasBandeira = $<HTMLCanvasElement>("bandeira");
@@ -43,7 +46,7 @@ const canvasArte = document.createElement("canvas");
 const renderizador = new Renderizador(canvasBandeira);
 
 const luz = document.createElement("video");
-luz.src = urlLuz;
+luz.src = urlLuz(estado.duracao);
 luz.muted = true;
 luz.loop = true;
 luz.playsInline = true;
@@ -192,7 +195,7 @@ function atualizarModal(): void {
 }
 
 function quadro(): void {
-    renderizador.desenhar(luz, estado.tecido);
+    if (!estado.pausarPrevia) renderizador.desenhar(luz, estado.tecido);
     if ("requestVideoFrameCallback" in luz) {
         luz.requestVideoFrameCallback(quadro);
     } else {
@@ -351,20 +354,58 @@ function travarBotoes(travar: boolean): void {
     }
 }
 
+const BITRATE_GRAVACAO: Record<Qualidade, number> = { leve: 1_000_000, media: 2_500_000, alta: 6_000_000 };
+
+function opcaoMarcada(nome: string): string {
+    return document.querySelector<HTMLInputElement>(`input[name="${nome}"]:checked`)?.value ?? "";
+}
+
 async function exportar(formato: Formato): Promise<void> {
     if (estado.gravando) return;
     estado.gravando = true;
     travarBotoes(true);
+    const qualidade = (opcaoMarcada("qualidade") || "media") as Qualidade;
+    const largura = Number(opcaoMarcada("resolucao")) || 1280;
+    const altura = Math.round((largura * 366) / 1280 / 2) * 2;
+    const nome = `bandeira-${nomeBase()}-${estado.duracao}s${largura === 1280 ? "" : `-${largura}`}.${formato}`;
+    const inicio = performance.now();
     try {
-        const qualidade = Number(document.querySelector<HTMLInputElement>('input[name="qualidade"]:checked')?.value ?? 1_000_000);
-        const blob = await gravarVideo(canvasBandeira, luz, formato, qualidade, (f) =>
-            status(`Gravando ${formato.toUpperCase()}… ${Math.round(f * 100)}%`),
-        );
-        baixarBlob(blob, `bandeira-${nomeBase()}.${formato}`);
-        status(`${formato.toUpperCase()} pronto (${(blob.size / 1024 / 1024).toFixed(1)} MB).`);
+        let blob: Blob | null = null;
+        if (webCodecsDisponivel()) {
+            estado.pausarPrevia = true;
+            luz.pause();
+            renderizador.redimensionar(largura, altura);
+            try {
+                blob = await codificarVideo({
+                    formato,
+                    qualidade,
+                    largura,
+                    altura,
+                    urlLuz: urlLuz(estado.duracao),
+                    canvas: canvasBandeira,
+                    desenharQuadro: (q) => renderizador.desenhar(q, estado.tecido),
+                    aoProgredir: (f) => status(`Gerando ${formato.toUpperCase()}… ${Math.round(f * 100)}%`),
+                });
+            } catch (erro) {
+                console.warn("WebCodecs falhou, usando gravação em tempo real.", erro);
+            } finally {
+                estado.pausarPrevia = false;
+            }
+        }
+        if (!blob) {
+            renderizador.redimensionar(largura, altura);
+            blob = await gravarVideo(canvasBandeira, luz, formato, BITRATE_GRAVACAO[qualidade], (f) =>
+                status(`Gravando ${formato.toUpperCase()}… ${Math.round(f * 100)}%`),
+            );
+        }
+        baixarBlob(blob, nome);
+        const tamanho = blob.size >= 1024 * 1024 ? `${(blob.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(blob.size / 1024)} KB`;
+        status(`${formato.toUpperCase()} pronto: ${tamanho}, em ${((performance.now() - inicio) / 1000).toFixed(1)} s.`);
     } catch (erro) {
-        status(erro instanceof Error ? erro.message : "Falha ao gravar o vídeo.");
+        status(erro instanceof Error ? erro.message : "Falha ao gerar o vídeo.");
     } finally {
+        renderizador.redimensionar(1280, 366);
+        if (luz.paused) void luz.play().catch(() => undefined);
         estado.gravando = false;
         travarBotoes(false);
     }
@@ -372,13 +413,21 @@ async function exportar(formato: Formato): Promise<void> {
 
 for (const [id, formato] of [["baixarWebm", "webm"], ["baixarMp4", "mp4"]] as const) {
     const botao = $<HTMLButtonElement>(id);
-    if (!tipoSuportado(formato)) {
+    if (!webCodecsDisponivel() && !tipoSuportado(formato)) {
         botao.disabled = true;
         botao.dataset.semSuporte = "1";
-        botao.title = `Este navegador não grava ${formato.toUpperCase()}.`;
+        botao.title = `Este navegador não gera ${formato.toUpperCase()}.`;
     }
     botao.addEventListener("click", () => void exportar(formato));
 }
+
+document.querySelectorAll<HTMLInputElement>('input[name="duracao"]').forEach((radio) =>
+    radio.addEventListener("change", () => {
+        estado.duracao = Number(radio.value);
+        luz.src = urlLuz(estado.duracao);
+        void luz.play().catch(() => undefined);
+    }),
+);
 
 $("baixarArte").addEventListener("click", () => {
     const arte = criarCanvasArte(configArte(), 720);
@@ -406,7 +455,7 @@ $("baixarConfig").addEventListener("click", () => {
         texto: estado.texto,
         textoClaro: textoClaro(),
         veu: estado.veu,
-        video: `bandeira-${nomeBase()}.webm`,
+        video: `bandeira-${nomeBase()}-${estado.duracao}s.webm`,
         logo: { imagem: estado.logo?.toDataURL("image/png") ?? null, altura: estado.tamanho, x: estado.posX, y: estado.posY },
         formas: estado.formas,
         tecido: estado.tecido,

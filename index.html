@@ -117,11 +117,26 @@
     <section class="grupo">
       <h2>Baixar</h2>
       <div class="campo">
+        <span>Duração do loop</span>
+        <div class="segmentado" role="radiogroup" aria-label="Duração do loop">
+          <label><input type="radio" name="duracao" value="6"><span>6 s</span></label>
+          <label><input type="radio" name="duracao" value="10" checked><span>10 s</span></label>
+          <label><input type="radio" name="duracao" value="20"><span>20 s</span></label>
+        </div>
+      </div>
+      <div class="campo">
+        <span>Resolução</span>
+        <div class="segmentado duas" role="radiogroup" aria-label="Resolução do vídeo">
+          <label><input type="radio" name="resolucao" value="1280" checked><span>1280 px</span></label>
+          <label><input type="radio" name="resolucao" value="960"><span>960 px (celular)</span></label>
+        </div>
+      </div>
+      <div class="campo">
         <span>Qualidade do vídeo</span>
         <div class="segmentado" role="radiogroup" aria-label="Qualidade do vídeo">
-          <label><input type="radio" name="qualidade" value="1000000" checked><span>Leve</span></label>
-          <label><input type="radio" name="qualidade" value="2500000"><span>Média</span></label>
-          <label><input type="radio" name="qualidade" value="6000000"><span>Alta</span></label>
+          <label><input type="radio" name="qualidade" value="leve"><span>Leve</span></label>
+          <label><input type="radio" name="qualidade" value="media" checked><span>Média</span></label>
+          <label><input type="radio" name="qualidade" value="alta"><span>Alta</span></label>
         </div>
       </div>
       <div class="botoes">

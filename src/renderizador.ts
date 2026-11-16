@@ -71,7 +71,7 @@ export class Renderizador {
     private readonly texArte: WebGLTexture;
     private readonly uniforms: Record<string, WebGLUniformLocation | null>;
 
-    constructor(canvas: HTMLCanvasElement) {
+    constructor(private readonly canvas: HTMLCanvasElement) {
         const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true, antialias: false });
         if (!gl) throw new Error("Este navegador não tem WebGL2.");
         this.gl = gl;
@@ -117,9 +117,17 @@ export class Renderizador {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
     }
 
-    desenhar(luz: HTMLVideoElement, ajustes: AjustesTecido): void {
+    redimensionar(largura: number, altura: number): void {
+        if (this.canvas.width !== largura || this.canvas.height !== altura) {
+            this.canvas.width = largura;
+            this.canvas.height = altura;
+        }
+        this.gl.viewport(0, 0, largura, altura);
+    }
+
+    desenhar(luz: HTMLVideoElement | VideoFrame, ajustes: AjustesTecido): void {
         const gl = this.gl;
-        if (luz.readyState >= 2) {
+        if (!(luz instanceof HTMLVideoElement) || luz.readyState >= 2) {
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, this.texLuz);
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, luz);
