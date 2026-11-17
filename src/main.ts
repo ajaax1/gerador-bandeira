@@ -37,7 +37,7 @@ const estado = {
     tecido: { ...PADRAO_TECIDO },
     formas: [] as Forma[],
     selecionados: [] as string[],
-    duracao: 10,
+    duracao: 8,
     gravando: false,
     pausarPrevia: false,
 };

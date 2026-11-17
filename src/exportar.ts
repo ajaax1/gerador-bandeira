@@ -45,7 +45,7 @@ export async function gravarVideo(
     await new Promise<void>((resolve) => luz.addEventListener("seeked", () => resolve(), { once: true }));
 
     const fim = new Promise<void>((resolve) => {
-        const progresso = () => aoProgredir(Math.min(1, luz.currentTime / (luz.duration || 20)));
+        const progresso = () => aoProgredir(Math.min(1, luz.currentTime / (luz.duration || 8)));
         luz.addEventListener("timeupdate", progresso);
         luz.addEventListener(
             "ended",
