@@ -7,6 +7,7 @@ import {
     criarForma,
     duplicarForma,
     fonteCss,
+    modeloArcoBorda,
     modeloDiagonal,
     modeloDuasFaixasV,
     modeloTresFaixas,
@@ -35,7 +36,7 @@ const estado = {
     veu: 0.25,
     tecido: { ...PADRAO_TECIDO },
     formas: [] as Forma[],
-    selecionado: null as string | null,
+    selecionados: [] as string[],
     duracao: 10,
     gravando: false,
     pausarPrevia: false,
@@ -75,9 +76,9 @@ function retanguloLogo() {
 const editor = new Editor($<HTMLCanvasElement>("editor"), {
     arte: () => canvasArte,
     formas: () => estado.formas,
-    selecionado: () => estado.selecionado,
+    selecionados: () => estado.selecionados,
     logo: retanguloLogo,
-    selecionar: (id) => selecionar(id),
+    selecionar: (ids) => selecionarIds(ids),
     alterar: () => {
         agendarArte();
         painel.sincronizar();
@@ -86,7 +87,9 @@ const editor = new Editor($<HTMLCanvasElement>("editor"), {
         definirFaixa("posX", x);
         definirFaixa("posY", y);
     },
-    remover: (id) => remover(id),
+    remover: (ids) => removerFormas(ids),
+    iniciarGesto: () => iniciarGesto(),
+    encerrarGesto: () => encerrarGesto(),
 });
 
 let arteAgendada = false;
@@ -115,21 +118,154 @@ function atualizarArte(): void {
     criarCanvasArte(configArte(), undefined, canvasArte);
     renderizador.atualizarArte(canvasArte);
     editor.desenhar();
+    registrarHistorico();
 }
+
+interface Instantaneo {
+    formas: Forma[];
+    cor: string;
+    logo: HTMLCanvasElement | null;
+    arquivoLogo: File | null;
+    tamanho: number;
+    posX: number;
+    posY: number;
+    selecionados: string[];
+}
+
+const LIMITE_HISTORICO = 100;
+const historico = {
+    desfazer: [] as Instantaneo[],
+    refazer: [] as Instantaneo[],
+    atual: null as Instantaneo | null,
+    ultimo: 0,
+    separar: true,
+    gesto: false,
+    gestoSujo: false,
+};
+
+function capturar(): Instantaneo {
+    return {
+        formas: structuredClone(estado.formas),
+        cor: estado.cor,
+        logo: estado.logo,
+        arquivoLogo: estado.arquivoLogo,
+        tamanho: estado.tamanho,
+        posX: estado.posX,
+        posY: estado.posY,
+        selecionados: [...estado.selecionados],
+    };
+}
+
+function mesmoDesenho(a: Instantaneo, b: Instantaneo): boolean {
+    return (
+        a.cor === b.cor &&
+        a.logo === b.logo &&
+        a.tamanho === b.tamanho &&
+        a.posX === b.posX &&
+        a.posY === b.posY &&
+        JSON.stringify(a.formas) === JSON.stringify(b.formas)
+    );
+}
+
+function novaEtapa(): void {
+    historico.separar = true;
+}
+
+function iniciarGesto(): void {
+    historico.gesto = true;
+    historico.gestoSujo = false;
+}
+
+function encerrarGesto(): void {
+    historico.gesto = false;
+    historico.ultimo = performance.now();
+}
+
+function registrarHistorico(): void {
+    const novo = capturar();
+    if (!historico.atual) {
+        historico.atual = novo;
+        return;
+    }
+    if (mesmoDesenho(novo, historico.atual)) {
+        historico.atual.selecionados = novo.selecionados;
+        return;
+    }
+    const agora = performance.now();
+    const juntar = historico.gesto ? historico.gestoSujo : !historico.separar && agora - historico.ultimo < 600;
+    if (!juntar) {
+        historico.desfazer.push(historico.atual);
+        if (historico.desfazer.length > LIMITE_HISTORICO) historico.desfazer.shift();
+    }
+    historico.atual = novo;
+    historico.refazer = [];
+    historico.ultimo = agora;
+    historico.separar = false;
+    if (historico.gesto) historico.gestoSujo = true;
+    atualizarBotoesHistorico();
+}
+
+function atualizarBotoesHistorico(): void {
+    $<HTMLButtonElement>("desfazer").disabled = !historico.desfazer.length;
+    $<HTMLButtonElement>("refazer").disabled = !historico.refazer.length;
+}
+
+function aplicarInstantaneo(inst: Instantaneo): void {
+    historico.atual = inst;
+    estado.formas = structuredClone(inst.formas);
+    estado.cor = inst.cor;
+    estado.logo = inst.logo;
+    estado.arquivoLogo = inst.arquivoLogo;
+    estado.tamanho = inst.tamanho;
+    estado.posX = inst.posX;
+    estado.posY = inst.posY;
+    $("uploadTexto").textContent = inst.arquivoLogo?.name ?? TEXTO_UPLOAD;
+    definirFaixa("tamanho", inst.tamanho);
+    definirFaixa("posX", inst.posX);
+    definirFaixa("posY", inst.posY);
+    const existentes = new Set([...estado.formas.map((f) => f.id), ...(estado.logo ? [ID_LOGO] : [])]);
+    estado.selecionados = inst.selecionados.filter((id) => existentes.has(id));
+    painel.renderizarPropriedades(formasSelecionadas());
+    definirCor(inst.cor);
+    atualizarCamadas();
+    atualizarArte();
+    historico.separar = true;
+    atualizarBotoesHistorico();
+}
+
+function desfazer(): void {
+    const anterior = historico.desfazer.pop();
+    if (!anterior || !historico.atual) return;
+    historico.refazer.push(historico.atual);
+    aplicarInstantaneo(anterior);
+    status("Desfeito.");
+}
+
+function refazer(): void {
+    const proximo = historico.refazer.pop();
+    if (!proximo || !historico.atual) return;
+    historico.desfazer.push(historico.atual);
+    aplicarInstantaneo(proximo);
+    status("Refeito.");
+}
+
+const TEXTO_UPLOAD = "Escolher arquivo (PNG ou SVG com fundo transparente)";
 
 const painel = new PainelFormas($("adicionarFormas"), $<HTMLUListElement>("camadas"), $("propriedades"), {
     adicionar: (tipo: TipoForma) => {
         const cor = luminancia(estado.cor) < 0.45 ? "#FFFFFF" : "#1F2937";
         const forma = criarForma(tipo, { cor, texto: estado.sigla || "SIGLA" });
+        novaEtapa();
         estado.formas.push(forma);
-        selecionar(forma.id);
+        selecionarIds([forma.id]);
         atualizarArte();
     },
-    selecionar: (id) => selecionar(id),
+    selecionar: (id, adicionar) => alternarSelecao(id, adicionar),
     mover: (id, direcao) => {
         const i = estado.formas.findIndex((f) => f.id === id);
         const j = i + direcao;
         if (i < 0 || j < 0 || j >= estado.formas.length) return;
+        novaEtapa();
         [estado.formas[i], estado.formas[j]] = [estado.formas[j], estado.formas[i]];
         atualizarCamadas();
         atualizarArte();
@@ -138,11 +274,13 @@ const painel = new PainelFormas($("adicionarFormas"), $<HTMLUListElement>("camad
         const forma = estado.formas.find((f) => f.id === id);
         if (!forma) return;
         const copia = duplicarForma(forma);
+        novaEtapa();
         estado.formas.splice(estado.formas.indexOf(forma) + 1, 0, copia);
-        selecionar(copia.id);
+        selecionarIds([copia.id]);
         atualizarArte();
     },
-    remover: (id) => remover(id),
+    remover: (id) => removerFormas([id]),
+    removerVarios: (ids) => removerFormas(ids),
     alterar: () => {
         agendarArte();
         atualizarCamadas();
@@ -152,23 +290,39 @@ const painel = new PainelFormas($("adicionarFormas"), $<HTMLUListElement>("camad
 function atualizarCamadas(): void {
     $("grupoLogo").hidden = !estado.logo;
     $("tirarLogo").hidden = !estado.logo;
-    painel.renderizarCamadas(estado.formas, estado.selecionado, Boolean(estado.logo), ID_LOGO);
+    painel.renderizarCamadas(estado.formas, estado.selecionados, Boolean(estado.logo), ID_LOGO);
 }
 
-function selecionar(id: string | null): void {
-    if (estado.selecionado === id) return;
-    estado.selecionado = id;
+function formasSelecionadas(): Forma[] {
+    return estado.formas.filter((f) => estado.selecionados.includes(f.id));
+}
+
+function selecionarIds(ids: string[]): void {
+    if (ids.length === estado.selecionados.length && ids.every((id, i) => id === estado.selecionados[i])) return;
+    estado.selecionados = ids;
     atualizarCamadas();
-    painel.renderizarPropriedades(estado.formas.find((f) => f.id === id) ?? null);
+    painel.renderizarPropriedades(formasSelecionadas());
     editor.desenhar();
 }
 
-function remover(id: string): void {
-    estado.formas = estado.formas.filter((f) => f.id !== id);
-    if (estado.selecionado === id) {
-        estado.selecionado = null;
-        painel.renderizarPropriedades(null);
+function alternarSelecao(id: string | null, adicionar = false): void {
+    if (id === null) {
+        selecionarIds([]);
+        return;
     }
+    if (!adicionar) {
+        selecionarIds([id]);
+        return;
+    }
+    const atuais = estado.selecionados;
+    selecionarIds(atuais.includes(id) ? atuais.filter((x) => x !== id) : [...atuais, id]);
+}
+
+function removerFormas(ids: string[]): void {
+    novaEtapa();
+    estado.formas = estado.formas.filter((f) => !ids.includes(f.id));
+    estado.selecionados = estado.selecionados.filter((id) => !ids.includes(id));
+    painel.renderizarPropriedades(formasSelecionadas());
     atualizarCamadas();
     atualizarArte();
 }
@@ -253,6 +407,7 @@ async function lerLogo(): Promise<void> {
     if (!estado.arquivoLogo) return;
     try {
         const { imagem } = await carregarLogo(estado.arquivoLogo, $<HTMLInputElement>("removerBranco").checked);
+        novaEtapa();
         estado.logo = imagem;
         $("uploadTexto").textContent = estado.arquivoLogo.name;
         atualizarCamadas();
@@ -264,11 +419,12 @@ async function lerLogo(): Promise<void> {
 }
 
 function tirarLogo(): void {
+    novaEtapa();
     estado.logo = null;
     estado.arquivoLogo = null;
     $<HTMLInputElement>("logo").value = "";
-    $("uploadTexto").textContent = "Escolher arquivo (PNG ou SVG com fundo transparente)";
-    if (estado.selecionado === ID_LOGO) estado.selecionado = null;
+    $("uploadTexto").textContent = TEXTO_UPLOAD;
+    estado.selecionados = estado.selecionados.filter((id) => id !== ID_LOGO);
     atualizarCamadas();
     atualizarArte();
 }
@@ -316,14 +472,16 @@ document.querySelectorAll<HTMLButtonElement>("[data-modelo]").forEach((botao) =>
     botao.addEventListener("click", () => {
         const claro = luminancia(estado.cor) < 0.45;
         const contraste = claro ? "#FFFFFF" : "#1F2937";
-        const novas =
-            botao.dataset.modelo === "tresFaixas"
-                ? modeloTresFaixas(["#111111", "#FFFFFF", estado.cor])
-                : botao.dataset.modelo === "diagonal"
-                  ? modeloDiagonal(contraste)
-                  : modeloDuasFaixasV(contraste);
+        const modelos: Record<string, () => Forma[]> = {
+            tresFaixas: () => modeloTresFaixas(["#111111", "#FFFFFF", estado.cor]),
+            diagonal: () => modeloDiagonal(contraste),
+            faixasV: () => modeloDuasFaixasV(contraste),
+            bordaCurva: () => modeloArcoBorda(),
+        };
+        const novas = (modelos[botao.dataset.modelo ?? ""] ?? modelos.faixasV)();
+        novaEtapa();
         estado.formas.push(...novas);
-        selecionar(novas[novas.length - 1].id);
+        selecionarIds(novas.map((f) => f.id));
         atualizarArte();
     }),
 );
@@ -464,6 +622,8 @@ $("baixarConfig").addEventListener("click", () => {
 });
 
 async function abrirProjeto(arquivo: File): Promise<void> {
+    novaEtapa();
+    iniciarGesto();
     try {
         const projeto = JSON.parse(await arquivo.text()) as Partial<Projeto>;
         estado.sigla = projeto.sigla ?? "";
@@ -484,8 +644,8 @@ async function abrirProjeto(arquivo: File): Promise<void> {
             }
         }
         estado.formas = (projeto.formas ?? []).map((f) => criarForma(f.tipo, f));
-        estado.selecionado = null;
-        painel.renderizarPropriedades(null);
+        estado.selecionados = [];
+        painel.renderizarPropriedades([]);
         if (projeto.logo?.imagem) {
             const resposta = await fetch(projeto.logo.imagem);
             estado.arquivoLogo = new File([await resposta.blob()], "logo do projeto.png", { type: "image/png" });
@@ -500,6 +660,8 @@ async function abrirProjeto(arquivo: File): Promise<void> {
         status(`Projeto "${arquivo.name}" aberto.`);
     } catch {
         status("Não foi possível abrir esse projeto.");
+    } finally {
+        encerrarGesto();
     }
 }
 
@@ -517,15 +679,33 @@ async function carregarExemplo(): Promise<void> {
         if (estado.arquivoLogo) return;
         estado.arquivoLogo = arquivo;
         await lerLogo();
+        historico.desfazer = [];
+        historico.atual = capturar();
+        atualizarBotoesHistorico();
         $("uploadTexto").textContent = "Exemplo: logo do PT. Escolha outro arquivo";
     } catch {
         status("");
     }
 }
 
+$("desfazer").addEventListener("click", desfazer);
+$("refazer").addEventListener("click", refazer);
+
+document.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    const tecla = e.key.toLowerCase();
+    if (tecla !== "z" && tecla !== "y") return;
+    const alvo = e.target as HTMLElement | null;
+    const tipo = alvo instanceof HTMLInputElement ? alvo.type : "";
+    if (alvo instanceof HTMLTextAreaElement || ["text", "number", "search"].includes(tipo)) return;
+    e.preventDefault();
+    if (tecla === "y" || e.shiftKey) refazer();
+    else desfazer();
+});
 
 atualizarCamadas();
 atualizarArte();
+atualizarBotoesHistorico();
 atualizarModal();
 quadro();
 void carregarExemplo();

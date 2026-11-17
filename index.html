@@ -68,6 +68,7 @@
           <button type="button" class="botao secundario" data-modelo="tresFaixas">3 faixas</button>
           <button type="button" class="botao secundario" data-modelo="diagonal">Diagonal</button>
           <button type="button" class="botao secundario" data-modelo="faixasV">Faixas verticais</button>
+          <button type="button" class="botao secundario" data-modelo="bordaCurva">Borda curva</button>
         </div>
       </div>
       <div class="campo">
@@ -186,7 +187,11 @@
     <section class="editorBloco">
       <div class="editorTopo">
         <strong>Desenho da bandeira</strong>
-        <span>Clique para selecionar, arraste para mover e use a alça redonda para redimensionar. Setas movem; Delete apaga.</span>
+        <span>Clique para selecionar e arraste para mover. Alça branca redimensiona, alça azul gira (Shift trava de 15 em 15°). Shift ou Ctrl + clique, ou arrastar num espaço vazio, seleciona várias. Ctrl+A seleciona tudo; setas movem; Delete apaga; Ctrl+Z desfaz e Ctrl+Shift+Z refaz.</span>
+        <div class="historicoAcoes">
+          <button type="button" class="botao secundario" id="desfazer" disabled>Desfazer</button>
+          <button type="button" class="botao secundario" id="refazer" disabled>Refazer</button>
+        </div>
       </div>
       <canvas id="editor" tabindex="0" aria-label="Editor da bandeira: selecione e mova as formas"></canvas>
     </section>

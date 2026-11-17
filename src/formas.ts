@@ -6,6 +6,7 @@ export type TipoForma =
     | "estrela"
     | "faixaH"
     | "faixaV"
+    | "arco"
     | "texto";
 
 export interface Forma {
@@ -19,6 +20,8 @@ export interface Forma {
     cor: string;
     opacidade: number;
     raio: number;
+    espessura: number;
+    abertura: number;
     texto: string;
     fonte: string;
     negrito: boolean;
@@ -33,6 +36,7 @@ export const NOMES_FORMA: Record<TipoForma, string> = {
     estrela: "Estrela",
     faixaH: "Faixa horizontal",
     faixaV: "Faixa vertical",
+    arco: "Arco",
     texto: "Texto",
 };
 
@@ -64,6 +68,8 @@ export function criarForma(tipo: TipoForma, parcial: Partial<Forma> = {}): Forma
         cor: "#FFFFFF",
         opacidade: 1,
         raio: 0,
+        espessura: 36,
+        abertura: 180,
         texto: "SIGLA",
         fonte: "Montserrat",
         negrito: true,
@@ -74,6 +80,7 @@ export function criarForma(tipo: TipoForma, parcial: Partial<Forma> = {}): Forma
     if (tipo === "retangulo") Object.assign(base, { largura: 260, altura: 160 });
     if (tipo === "elipse") Object.assign(base, { largura: 220, altura: 220 });
     if (tipo === "texto") Object.assign(base, { altura: 120 });
+    if (tipo === "arco") Object.assign(base, { x: 1000, largura: 520, altura: 320 });
     return { ...base, ...parcial, id: parcial.id ?? base.id };
 }
 
@@ -97,6 +104,7 @@ export function tamanhoVisual(forma: Forma): { largura: number; altura: number }
     if (forma.tipo === "texto") return { largura: larguraTexto(forma), altura: forma.altura };
     if (forma.tipo === "faixaH") return { largura: 1280, altura: forma.altura };
     if (forma.tipo === "faixaV") return { largura: forma.largura, altura: 366 };
+    if (forma.tipo === "arco") return { largura: forma.largura + forma.espessura, altura: forma.altura + forma.espessura };
     return { largura: forma.largura, altura: forma.altura };
 }
 
@@ -152,6 +160,16 @@ export function desenharForma(ctx: CanvasRenderingContext2D, forma: Forma, centr
         case "faixaV":
             ctx.rect(-w / 2, -EXTENSAO, w, EXTENSAO * 2);
             break;
+        case "arco": {
+            const meia = (Math.max(1, Math.min(360, forma.abertura)) * Math.PI) / 360;
+            ctx.ellipse(0, 0, Math.max(1, w / 2), Math.max(1, h / 2), 0, -meia, meia);
+            ctx.lineWidth = forma.espessura;
+            ctx.lineCap = "butt";
+            ctx.strokeStyle = forma.cor;
+            ctx.stroke();
+            ctx.restore();
+            return;
+        }
         case "texto":
             ctx.font = fonteCss(forma);
             ctx.textAlign = "center";
@@ -175,8 +193,27 @@ export function contemPonto(forma: Forma, px: number, py: number, centroY: numbe
     const local = paraLocal(forma, px, py, centroY);
     if (forma.tipo === "faixaH") return Math.abs(local.y) <= forma.altura / 2;
     if (forma.tipo === "faixaV") return Math.abs(local.x) <= forma.largura / 2;
+    if (forma.tipo === "arco") return dentroDoArco(forma, local.x, local.y);
     const { largura, altura } = tamanhoVisual(forma);
     return Math.abs(local.x) <= largura / 2 && Math.abs(local.y) <= altura / 2;
+}
+
+function dentroDoArco(forma: Forma, x: number, y: number): boolean {
+    const rx = Math.max(1, forma.largura / 2);
+    const ry = Math.max(1, forma.altura / 2);
+    const angulo = Math.atan2(y / ry, x / rx);
+    const meia = (Math.max(1, Math.min(360, forma.abertura)) * Math.PI) / 360;
+    if (Math.abs(angulo) > meia + 0.02) return false;
+    const naCurva = { x: Math.cos(angulo) * rx, y: Math.sin(angulo) * ry };
+    const folga = Math.max(10, forma.espessura / 2 + 4);
+    return Math.hypot(x - naCurva.x, y - naCurva.y) <= folga;
+}
+
+export function modeloArcoBorda(): Forma[] {
+    return [
+        criarForma("arco", { x: 1350, largura: 760, altura: 560, espessura: 34, abertura: 120, rotacao: 180, cor: "#009C3B" }),
+        criarForma("arco", { x: 1350, largura: 692, altura: 492, espessura: 34, abertura: 120, rotacao: 180, cor: "#FFDF00" }),
+    ];
 }
 
 export function modeloTresFaixas(cores: [string, string, string]): Forma[] {

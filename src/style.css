@@ -411,3 +411,10 @@ input[type="number"]:focus-visible, select:focus-visible { outline: 2px solid va
     .dados strong { font-size: 1.3rem; }
     .modalCorpo { grid-template-columns: 1fr; }
 }
+.dicaVarias { margin: 0; font-size: 0.85rem; line-height: 1.4; opacity: 0.75; }
+.botao.secundario.perigoTexto { color: #b42318; border-color: currentColor; }
+@media (prefers-color-scheme: dark) { .botao.secundario.perigoTexto { color: #f8a5a5; } }
+.historicoAcoes { display: flex; gap: 6px; margin-top: 6px; }
+.historicoAcoes button { padding: 4px 10px; font-size: 0.85rem; }
+.historicoAcoes .botao.secundario { color: #fff; border-color: rgba(255, 255, 255, 0.6); }
+.historicoAcoes .botao.secundario:hover:not(:disabled) { background: rgba(255, 255, 255, 0.15); color: #fff; }

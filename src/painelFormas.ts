@@ -8,6 +8,7 @@ const ICONES: Record<TipoForma, string> = {
     estrela: '<path d="m12 3 2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7Z"/>',
     faixaH: '<rect x="2" y="9" width="20" height="6"/>',
     faixaV: '<rect x="9" y="2" width="6" height="20"/>',
+    arco: '<path d="M4 19a8 8 0 0 1 16 0"/>',
     texto: '<path d="M5 6h14M12 6v13M9 19h6"/>',
 };
 
@@ -24,15 +25,16 @@ function svg(caminho: string): string {
 
 export interface AcoesPainel {
     adicionar: (tipo: TipoForma) => void;
-    selecionar: (id: string | null) => void;
+    selecionar: (id: string | null, adicionar?: boolean) => void;
     mover: (id: string, direcao: 1 | -1) => void;
     duplicar: (id: string) => void;
     remover: (id: string) => void;
+    removerVarios: (ids: string[]) => void;
     alterar: () => void;
 }
 
 interface CampoNumero {
-    chave: "x" | "y" | "largura" | "altura" | "rotacao" | "opacidade" | "raio";
+    chave: "x" | "y" | "largura" | "altura" | "rotacao" | "opacidade" | "raio" | "espessura" | "abertura";
     rotulo: string;
     min: number;
     max: number;
@@ -53,6 +55,10 @@ function camposPara(forma: Forma): CampoNumero[] {
     campos.push({ chave: "rotacao", rotulo: "Rotação (graus)", min: -180, max: 180, passo: 1 });
     campos.push({ chave: "opacidade", rotulo: "Opacidade", min: 0, max: 1, passo: 0.05 });
     if (forma.tipo === "retangulo") campos.push({ chave: "raio", rotulo: "Arredondar cantos", min: 0, max: 300, passo: 1 });
+    if (forma.tipo === "arco") {
+        campos.push({ chave: "espessura", rotulo: "Espessura", min: 2, max: 300, passo: 1 });
+        campos.push({ chave: "abertura", rotulo: "Abertura (graus)", min: 10, max: 360, passo: 1 });
+    }
     const vistos = new Set<string>();
     return campos.filter((c) => (vistos.has(c.chave) ? false : (vistos.add(c.chave), true)));
 }
@@ -78,16 +84,16 @@ export class PainelFormas {
         }
     }
 
-    renderizarCamadas(formas: Forma[], selecionado: string | null, temLogo: boolean, idLogo: string): void {
+    renderizarCamadas(formas: Forma[], selecionados: string[], temLogo: boolean, idLogo: string): void {
         this.lista.replaceChildren();
         if (temLogo) {
             const li = document.createElement("li");
-            li.className = `camada${selecionado === idLogo ? " ativa" : ""}`;
+            li.className = `camada${selecionados.includes(idLogo) ? " ativa" : ""}`;
             const botao = document.createElement("button");
             botao.type = "button";
             botao.className = "camadaNome";
             botao.innerHTML = `<span class="amostra amostraLogo" aria-hidden="true"></span><span>Logo</span>`;
-            botao.addEventListener("click", () => this.acoes.selecionar(idLogo));
+            botao.addEventListener("click", (e) => this.acoes.selecionar(idLogo, e.shiftKey || e.ctrlKey || e.metaKey));
             li.appendChild(botao);
             this.lista.appendChild(li);
         }
@@ -101,7 +107,7 @@ export class PainelFormas {
         [...formas].reverse().forEach((forma, indiceInvertido) => {
             const indice = formas.length - 1 - indiceInvertido;
             const li = document.createElement("li");
-            li.className = `camada${forma.id === selecionado ? " ativa" : ""}`;
+            li.className = `camada${selecionados.includes(forma.id) ? " ativa" : ""}`;
             const nome = document.createElement("button");
             nome.type = "button";
             nome.className = "camadaNome";
@@ -110,7 +116,7 @@ export class PainelFormas {
             const rotulo = document.createElement("span");
             rotulo.textContent = titulo;
             nome.appendChild(rotulo);
-            nome.addEventListener("click", () => this.acoes.selecionar(forma.id));
+            nome.addEventListener("click", (e) => this.acoes.selecionar(forma.id, e.shiftKey || e.ctrlKey || e.metaKey));
             li.appendChild(nome);
             const acoes: Array<[keyof typeof ICONES_ACAO, string, () => void, boolean]> = [
                 ["subir", "Trazer para frente", () => this.acoes.mover(forma.id, 1), indice === formas.length - 1],
@@ -133,10 +139,15 @@ export class PainelFormas {
         });
     }
 
-    renderizarPropriedades(forma: Forma | null): void {
-        this.formaAtual = forma;
+    renderizarPropriedades(formas: Forma[]): void {
         this.entradas.clear();
         this.areaPropriedades.replaceChildren();
+        this.formaAtual = formas.length === 1 ? formas[0] : null;
+        if (formas.length > 1) {
+            this.renderizarVarias(formas);
+            return;
+        }
+        const forma = this.formaAtual;
         if (!forma) return;
 
         const titulo = document.createElement("h3");
@@ -249,6 +260,47 @@ export class PainelFormas {
             campo.appendChild(linha);
             this.entradas.set(c.chave, [faixa, numero]);
         }
+    }
+
+    private renderizarVarias(formas: Forma[]): void {
+        const titulo = document.createElement("h3");
+        titulo.textContent = `${formas.length} formas selecionadas`;
+        const dica = document.createElement("p");
+        dica.className = "dicaVarias";
+        dica.textContent = "Arraste no editor ou use as setas para mover todas juntas. Shift ou Ctrl + clique tira ou põe uma forma na seleção.";
+        this.areaPropriedades.append(titulo, dica);
+
+        const campoCor = this.criarCampo("Cor de todas");
+        const picker = document.createElement("input");
+        picker.type = "color";
+        picker.value = formas[0].cor.toLowerCase();
+        picker.setAttribute("aria-label", "Cor de todas as formas selecionadas");
+        picker.addEventListener("input", () => {
+            for (const f of formas) f.cor = picker.value.toUpperCase();
+            this.acoes.alterar();
+        });
+        campoCor.appendChild(picker);
+
+        const campoOpacidade = this.criarCampo("Opacidade de todas");
+        const faixa = document.createElement("input");
+        faixa.type = "range";
+        faixa.min = "0";
+        faixa.max = "1";
+        faixa.step = "0.05";
+        faixa.value = String(formas[0].opacidade);
+        faixa.setAttribute("aria-label", "Opacidade de todas as formas selecionadas");
+        faixa.addEventListener("input", () => {
+            for (const f of formas) f.opacidade = Number(faixa.value);
+            this.acoes.alterar();
+        });
+        campoOpacidade.appendChild(faixa);
+
+        const excluir = document.createElement("button");
+        excluir.type = "button";
+        excluir.className = "botao secundario perigoTexto";
+        excluir.textContent = `Excluir ${formas.length} formas`;
+        excluir.addEventListener("click", () => this.acoes.removerVarios(formas.map((f) => f.id)));
+        this.areaPropriedades.appendChild(excluir);
     }
 
     sincronizar(): void {

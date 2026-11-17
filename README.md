@@ -24,9 +24,11 @@ Abra o endereço que o Vite mostrar (ex.: http://localhost:5173).
 
 ### Desenhar com formas
 
-- Em **Formas**, adicione retângulo, elipse, triângulo, losango, estrela, faixa horizontal, faixa vertical ou texto. As faixas atravessam a bandeira inteira; giradas, viram diagonais.
-- **Modelos prontos**: três faixas, diagonal e faixas verticais.
-- No **Desenho da bandeira** (abaixo da prévia): clique para selecionar, arraste para mover, use a alça redonda para redimensionar. Setas movem (Shift move mais), Delete apaga. O logo também pode ser arrastado.
+- Em **Formas**, adicione retângulo, elipse, triângulo, losango, estrela, faixa horizontal, faixa vertical, arco ou texto. As faixas atravessam a bandeira inteira; giradas, viram diagonais. O arco tem espessura e abertura (em graus) e serve para bordas curvas.
+- **Modelos prontos**: três faixas, diagonal, faixas verticais e borda curva (verde e amarela, como no PL).
+- No **Desenho da bandeira** (abaixo da prévia): clique para selecionar e arraste para mover. A alça branca redimensiona e a azul gira (com Shift, de 15 em 15°). Setas movem (Shift move mais), Delete apaga. O logo também pode ser arrastado.
+- **Várias formas**: Shift ou Ctrl + clique (no editor ou nas camadas) põe ou tira da seleção; arrastar num espaço vazio seleciona o que ficar dentro da caixa; Ctrl+A seleciona tudo. Juntas, elas se movem, mudam de cor e de opacidade e são excluídas de uma vez.
+- **Desfazer e refazer**: Ctrl+Z e Ctrl+Shift+Z (ou Ctrl+Y), ou os botões acima do editor. Valem para formas, cor de fundo e logo; os ajustes do tecido e do véu não entram.
 - **Camadas**: a de cima fica na frente; dá para subir, descer, duplicar e excluir. O logo fica sempre por cima das formas.
 - "Bandeira sem logo" tira o logo para fazer a bandeira só com formas.
 - **Salvar projeto** guarda tudo (formas, cor, logo embutido) num JSON; **Abrir projeto salvo** retoma depois.
